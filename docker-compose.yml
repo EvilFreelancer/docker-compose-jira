@@ -1,0 +1,47 @@
+version: "3"
+
+services:
+
+  nginx:
+    restart: unless-stopped
+    image: nginx:latest
+    ports:
+    - 80:80
+    - 443:443
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    volumes:
+    - ./configs/nginx:/etc/nginx/conf.d:ro
+    - ./configs/certbot/conf:/etc/letsencrypt:rw
+    - ./configs/certbot/www:/var/www/certbot:rw
+    - ./logs/nginx:/var/log/nginx
+
+  certbot:
+    restart: unless-stopped
+    image: certbot/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - ./configs/certbot/conf:/etc/letsencrypt:rw
+    - ./configs/certbot/www:/var/www/certbot:rw
+
+  core:
+    restart: unless-stopped
+    image: dchevell/jira-core:latest
+    environment:
+    - CATALINA_CONNECTOR_PROXYNAME=core
+    - CATALINA_CONNECTOR_PROXYPORT=80
+    - CATALINA_CONNECTOR_SCHEME=http
+    - CATALINA_CONNECTOR_SECURE=false
+    volumes:
+    - ./jira/core:/var/atlassian/application-data/jira
+
+  software:
+    restart: unless-stopped
+    image: dchevell/jira-software:latest
+    environment:
+    - CATALINA_CONNECTOR_PROXYNAME=software
+    - CATALINA_CONNECTOR_PROXYPORT=80
+    - CATALINA_CONNECTOR_SCHEME=http
+    - CATALINA_CONNECTOR_SECURE=false
+    volumes:
+    - ./jira/software:/var/atlassian/application-data/jira
